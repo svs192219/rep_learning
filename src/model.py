@@ -36,7 +36,7 @@ class Encoder(nn.Module):
         x = F.relu(self.fc1(x))
         mu = self.fc21(x)
         logvar = self.fc22(x)
-        return reparametrize(mu, logvar), mu, logvar
+        return self.reparametrize(mu, logvar), mu, logvar
 
     def reparametrize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
