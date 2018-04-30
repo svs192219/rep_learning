@@ -38,9 +38,9 @@ def load_data(opts):
     return dataloader
 
 def train(opts):
-    encoder = Encoder()
+    encoder = Encoder(opts.cuda)
     decoder = Decoder()
-    if torch.cuda.is_available():  
+    if opts.cuda:  
         encoder = encoder.cuda()
         decoder = decoder.cuda()
 
@@ -83,17 +83,17 @@ def train(opts):
 
                 return (recon_loss + kld_loss)
 
-            overall_loss = loss_func(X_sample, mu, logvar)
+            overall_loss = loss_func(X_sample, z_mu, z_logvar)
             # backpropagate
             overall_loss.backward()
-            running_loss += overall_loss.item()
+            running_loss += overall_loss.data[0]
             enc_optimizer.step()
             dec_optimizer.step()
 
             if batch_idx % opts.log_interval == 0:
                 print('Train Epoch: {} [{}/{}]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * X.size(0), len(dataloader.dataset),
-                    overall_loss.item() / X.size(0)))
+                    overall_loss.data[0] / X.size(0)))
 
                 # reconstructed image
                 encoder.eval()
@@ -104,8 +104,9 @@ def train(opts):
                 n = min(X.size(0), 8)
                 comparison = torch.cat([X[:n],
                                       X_sample.view(opts.batch_size, 3, 256, 256)[:n]])
-                save_image(comparison.cpu(),
-                             'results/reconstruction_' + str(epoch) + '.png', nrow=n)
+                img_name = 'results/reconstruction_' + str(epoch) + '.png'
+                utils.save_image(comparison.cpu().data,
+                        os.path.join(opts.save_path, img_name), nrow=n)
 
         print('====> Epoch: {} Average loss: {:.4f}'.format(
           epoch, running_loss / len(dataloader.dataset)))
@@ -118,7 +119,9 @@ def train(opts):
         if opts.cuda:
             sample = sample.cuda()
         sample = decoder(sample).cpu()
-        sample = (sample * opts.std) + opts.mean
+        def repeat_vector(vec, dims):
+            return torch.Tensor(vec).view(1, 3, 1, 1).repeat(dims[0], 1, dims[2], dims[3])
+        sample = (sample * repeat_vector(opt.std, sample.size())) + repeat_vector(opts.mean, sample.size())
         img_name = 'results/sample_' + str(epoch) + '_' + str(batch_idx) + '.png'
         utils.save_image(sample.data.view(16, 3, 256, 256),
                    os.path.join(opts.save_path, img_name))

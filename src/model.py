@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 def init_xavier(input_layer, bias_val=0):
     nn.init.xavier_normal(input_layer.weight);
@@ -8,8 +9,9 @@ def init_xavier(input_layer, bias_val=0):
     return input_layer
 
 class Encoder(nn.Module):  
-    def __init__(self):
+    def __init__(self, cuda):
         super(Encoder, self).__init__()
+        self.cudaPresent = cuda
         self.conv1_1 = init_xavier(nn.Conv2d(3, 8, 5))
         self.conv1_2 = init_xavier(nn.Conv2d(8, 16, 5))
         self.pool = nn.MaxPool2d(2, 2)
@@ -36,12 +38,14 @@ class Encoder(nn.Module):
         x = F.relu(self.fc1(x))
         mu = self.fc21(x)
         logvar = self.fc22(x)
-        return reparametrize(mu, logvar), mu, logvar
+        return self.reparametrize(mu, logvar), mu, logvar
 
     def reparametrize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return eps.mul(std).add_(mu)
+        eps = Variable(torch.randn(std.size()), requires_grad=False)
+        if self.cudaPresent:
+            eps = eps.cuda()
+        return (eps * std) + mu
 
 class Decoder(nn.Module):  
     def __init__(self):
