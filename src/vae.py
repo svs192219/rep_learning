@@ -17,6 +17,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from torchvision import transforms, utils, datasets
+from tensorboardX import SummaryWriter
 
 from model import *
 
@@ -49,6 +50,9 @@ def train(opts):
     enc_optimizer = optim.Adam(decoder.parameters(), lr=opts.lr)
     dec_optimizer = optim.Adam(decoder.parameters(), lr=opts.lr)
 
+    writer = SummaryWriter()
+
+    iter = 0
     for epoch in range(opts.epochs):  # loop over the dataset multiple times
         # exp_lr_scheduler.step()
 
@@ -90,6 +94,7 @@ def train(opts):
             enc_optimizer.step()
             dec_optimizer.step()
 
+            iter += 1
             if batch_idx % opts.log_interval == 0:
                 print('Train Epoch: {} [{}/{}]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * X.size(0), len(dataloader.dataset),
@@ -101,12 +106,12 @@ def train(opts):
                 z_sample, mu, logvar = encoder(X)
                 X_sample = decoder(z_sample)
                 
-                n = min(X.size(0), 8)
-                comparison = torch.cat([X[:n],
-                                      X_sample.view(opts.batch_size, 3, 256, 256)[:n]])
-                img_name = 'results/reconstruction_' + str(epoch) + '.png'
-                utils.save_image(comparison.cpu().data,
-                        os.path.join(opts.save_path, img_name), nrow=n)
+                comparison = torch.cat([X, X_sample])
+                # img_name = 'results/reconstruction_' + str(batch_idx) + '_' + str(epoch) + '.png'
+                # utils.save_image(comparison.cpu().data,
+                        # os.path.join(opts.save_path, img_name), nrow=n)
+                grid = utils.make_grid(comparison)
+                writer.add_image('reconstruction_grid', grid, iters)
 
         print('====> Epoch: {} Average loss: {:.4f}'.format(
           epoch, running_loss / len(dataloader.dataset)))
@@ -122,9 +127,10 @@ def train(opts):
         def repeat_vector(vec, dims):
             return torch.Tensor(vec).view(1, 3, 1, 1).repeat(dims[0], 1, dims[2], dims[3])
         sample = (sample * repeat_vector(opt.std, sample.size())) + repeat_vector(opts.mean, sample.size())
-        img_name = 'results/sample_' + str(epoch) + '_' + str(batch_idx) + '.png'
-        utils.save_image(sample.data.view(16, 3, 256, 256),
-                   os.path.join(opts.save_path, img_name))
+        # img_name = 'results/sample_' + str(epoch) + '_' + str(batch_idx) + '.png'
+        # utils.save_image(sample.data.view(16, 3, 256, 256),
+                   # os.path.join(opts.save_path, img_name))
+        writer.add_image('sample', utils.make_grid(sample), (epoch + 1))
 
 
 if __name__ == '__main__':
