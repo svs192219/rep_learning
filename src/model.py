@@ -4,8 +4,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 def init_xavier(input_layer, bias_val=0):
-    nn.init.xavier_normal(input_layer.weight);
-    nn.init.constant(input_layer.bias, bias_val);
+    nn.init.xavier_normal_(input_layer.weight);
+    nn.init.constant_(input_layer.bias, bias_val);
     return input_layer
 
 class Encoder(nn.Module):  

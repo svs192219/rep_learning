@@ -27,7 +27,7 @@ def str2bool(v):
 def load_data(opts):
 
     transform = transforms.Compose(
-                          [transforms.Scale((256, 256)),
+                          [transforms.Resize((256, 256)),
                            transforms.ToTensor(), 
                            transforms.Normalize(mean = opts.mean, std = opts.std)])
 
@@ -37,6 +37,13 @@ def load_data(opts):
                              shuffle=True, num_workers=opts.num_workers)
 
     return dataloader
+
+def repeat_vector(vec, dims):
+    return torch.Tensor(vec).view(1, 3, 1, 1).repeat(dims[0], 1, dims[2], dims[3])
+
+def unnormalize(sample):
+    return (sample * repeat_vector(opts.std, sample.size())) + repeat_vector(opts.mean, sample.size())
+
 
 def train(opts):
     encoder = Encoder(opts.cuda)
@@ -50,9 +57,11 @@ def train(opts):
     enc_optimizer = optim.Adam(decoder.parameters(), lr=opts.lr)
     dec_optimizer = optim.Adam(decoder.parameters(), lr=opts.lr)
 
-    writer = SummaryWriter()
+    writer = SummaryWriter(opts.save_path)
 
-    iter = 0
+    writer.add_text('Training options', json.dumps(vars(opts), indent=4), 0)
+
+    iters = 0
     for epoch in range(opts.epochs):  # loop over the dataset multiple times
         # exp_lr_scheduler.step()
 
@@ -90,47 +99,50 @@ def train(opts):
             overall_loss = loss_func(X_sample, z_mu, z_logvar)
             # backpropagate
             overall_loss.backward()
-            running_loss += overall_loss.data[0]
+            running_loss += overall_loss.item()
             enc_optimizer.step()
             dec_optimizer.step()
 
-            iter += 1
+            iters += 1
+
             if batch_idx % opts.log_interval == 0:
                 print('Train Epoch: {} [{}/{}]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * X.size(0), len(dataloader.dataset),
-                    overall_loss.data[0] / X.size(0)))
+                    overall_loss.item() / X.size(0)))
 
                 # reconstructed image
                 encoder.eval()
                 decoder.eval()
                 z_sample, mu, logvar = encoder(X)
                 X_sample = decoder(z_sample)
+                def repeat_vector(vec, dims):
+                    return torch.Tensor(vec).view(1, 3, 1, 1).repeat(dims[0], 1, dims[2], dims[3])
                 
                 comparison = torch.cat([X, X_sample])
                 # img_name = 'results/reconstruction_' + str(batch_idx) + '_' + str(epoch) + '.png'
                 # utils.save_image(comparison.cpu().data,
                         # os.path.join(opts.save_path, img_name), nrow=n)
-                grid = utils.make_grid(comparison)
-                writer.add_image('reconstruction_grid', grid, iters)
-
+                grid = utils.make_grid(unnormalize(comparison.cpu().data))
+                writer.add_image('image_reconstruction', grid, iters)
+                writer.add_scalar('loss', overall_loss.item(), iters)
+                
         print('====> Epoch: {} Average loss: {:.4f}'.format(
           epoch, running_loss / len(dataloader.dataset)))
 
-
+        torch.save(encoder.state_dict(), os.path.join(opts.save_path, 'encoder_' + str(epoch+1))
+        torch.save(decoder.state_dict(), os.path.join(opts.save_path, 'decoder_' + str(epoch+1)))
         encoder.eval()
         decoder.eval()
         sample = Variable(torch.randn(16, 256))
 
         if opts.cuda:
             sample = sample.cuda()
-        sample = decoder(sample).cpu()
-        def repeat_vector(vec, dims):
-            return torch.Tensor(vec).view(1, 3, 1, 1).repeat(dims[0], 1, dims[2], dims[3])
-        sample = (sample * repeat_vector(opt.std, sample.size())) + repeat_vector(opts.mean, sample.size())
+        sample = decoder(sample).cpu().data
+        sample = unnormalize(sample)
         # img_name = 'results/sample_' + str(epoch) + '_' + str(batch_idx) + '.png'
         # utils.save_image(sample.data.view(16, 3, 256, 256),
                    # os.path.join(opts.save_path, img_name))
-        writer.add_image('sample', utils.make_grid(sample), (epoch + 1))
+        writer.add_image('random_sample', utils.make_grid(sample), (epoch + 1))
 
 
 if __name__ == '__main__':
@@ -147,7 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_step_size', type=int, default=10, help='step size for LR scheduler')
     parser.add_argument('--weight_decay', type=float, default=0.0)
     parser.add_argument('--lr_scale', type=float, default=0.1)
-    parser.add_argument('--log_interval', type=int, default=15)
+    parser.add_argument('--log_interval', type=int, default=30)
 
     opts = parser.parse_args()
     opts.mean = [0.485, 0.456, 0.406]
