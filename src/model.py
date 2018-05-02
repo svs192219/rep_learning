@@ -107,9 +107,10 @@ class Discriminator(nn.Module):
         return F.sigmoid(self.lin3(x))
 
 class resnetEncoder(nn.Module):
-    def __init__(self, cuda, pretrained=True):
+    def __init__(self, nz, cuda, pretrained=True):
         super(resnetEncoder, self).__init__()
         self.cudaPresent = cuda
+        self.nz = nz
         resnet_copy = models.resnet18(pretrained=pretrained)
         self.features = nn.Sequential(resnet_copy.conv1,
                                       resnet_copy.bn1,
@@ -121,11 +122,22 @@ class resnetEncoder(nn.Module):
                                       resnet_copy.layer4,
                                       nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=False, count_include_pad=True)
                                       )
+        self.mu     = init_xavier(nn.Linear(512, self.nz))
+        self.logvar = init_xavier(nn.Linear(512, self.nz))
 
     def forward(self, x):
         x = self.features(x)
-        x = x.squeeze()
-        return x
+        x = x.view(-1, 512)
+        mu = self.mu(x)
+        logvar = self.logvar(x)
+        return self.reparametrize(mu, logvar), mu, logvar
+
+    def reparametrize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = Variable(torch.randn(std.size()), requires_grad=False)
+        if self.cudaPresent:
+            eps = eps.cuda()
+        return (eps * std) + mu
 
 class dcganDecoder(nn.Module):
     def __init__(self, nz, ngf=8, nc=3):
