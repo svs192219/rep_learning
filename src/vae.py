@@ -129,8 +129,8 @@ def train(opts):
         print('====> Epoch: {} Average loss: {:.4f}'.format(
           epoch, running_loss / len(dataloader.dataset)))
 
-        torch.save(encoder.state_dict(), os.path.join(opts.save_path, 'encoder_' + str(epoch+1)))
-        torch.save(decoder.state_dict(), os.path.join(opts.save_path, 'decoder_' + str(epoch+1)))
+        torch.save(encoder.state_dict(), os.path.join(opts.save_path, 'encoder'))
+        torch.save(decoder.state_dict(), os.path.join(opts.save_path, 'decoder'))
         encoder.eval()
         decoder.eval()
         sample = Variable(torch.randn(16, 256))
