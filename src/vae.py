@@ -46,8 +46,8 @@ def unnormalize(sample):
 
 
 def train(opts):
-    encoder = Encoder(opts.cuda)
-    decoder = Decoder()
+    encoder = resnetEncoder(opts.cuda)
+    decoder = dcganDecoder(nz=512)
     if opts.cuda:  
         encoder = encoder.cuda()
         decoder = decoder.cuda()

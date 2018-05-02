@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import models
 from torch.autograd import Variable
 
 def init_xavier(input_layer, bias_val=0):
@@ -104,3 +105,65 @@ class Discriminator(nn.Module):
         x = F.dropout(self.lin2(x), p=0.2, training=self.training)
         x = F.relu(x)
         return F.sigmoid(self.lin3(x))
+
+class resnetEncoder(nn.Module):
+    def __init__(self, cuda, pretrained=True):
+        super(resnetEncoder, self).__init__()
+        self.cudaPresent = cuda
+        resnet_copy = models.resnet18(pretrained=pretrained)
+        self.features = nn.Sequential(resnet_copy.conv1,
+                                      resnet_copy.bn1,
+                                      resnet_copy.relu,
+                                      resnet_copy.maxpool,
+                                      resnet_copy.layer1, 
+                                      resnet_copy.layer2,
+                                      resnet_copy.layer3,
+                                      resnet_copy.layer4,
+                                      nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=False, count_include_pad=True)
+                                      )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.squeeze()
+        return x
+
+class dcganDecoder(nn.Module):
+    def __init__(self, nz, ngf=8, nc=3):
+        super(dcganDecoder, self).__init__()
+        self.nz = nz
+        self.net = nn.Sequential(
+                    # input is Z (batch x nz x 1 x 1), going into a convolution
+                    nn.ConvTranspose2d(     nz,   ngf * 32, 4, 1, 0, bias=False),
+                    nn.BatchNorm2d(ngf * 32),
+                    nn.ReLU(True),
+                    # state size. (ngf*32) x 4 x 4
+                    nn.ConvTranspose2d(ngf * 32,  ngf * 16, 4, 2, 1, bias=False),
+                    nn.BatchNorm2d(ngf * 16),
+                    nn.ReLU(True),
+                    # state size. (ngf*16) x 8 x 8
+                    nn.ConvTranspose2d(ngf * 16,   ngf * 8, 4, 2, 1, bias=False),
+                    nn.BatchNorm2d(ngf * 8),
+                    nn.ReLU(True),
+                    # state size. (ngf*8) x 16 x 16
+                    nn.ConvTranspose2d( ngf * 8,    ngf* 4, 4, 2, 1, bias=False),
+                    nn.BatchNorm2d(ngf * 4),
+                    nn.ReLU(True),
+                    # state size. (ngf*4) x 32 x 32
+                    nn.ConvTranspose2d( ngf * 4,   ngf * 2, 4, 2, 1, bias=False),
+                    nn.BatchNorm2d(ngf * 2),
+                    nn.ReLU(True),
+                    # state size. (ngf*2) x 64 x 64
+                    nn.ConvTranspose2d( ngf * 2,       ngf, 4, 2, 1, bias=False),
+                    nn.BatchNorm2d(ngf),
+                    nn.ReLU(True),
+                    # state size. (ngf) x 128 x 128
+                    nn.ConvTranspose2d(     ngf,        nc, 4, 2, 1, bias=False),
+                    nn.Sigmoid()
+                    # state size. (nc) x 256 x 256
+                    )
+
+
+    def forward(self, x):
+        x = x.view(-1, self.nz, 1, 1)
+        x = self.net(x)
+        return x
