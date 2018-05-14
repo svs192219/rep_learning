@@ -27,7 +27,7 @@ def str2bool(v):
 def load_data(opts):
 
     transform = transforms.Compose(
-                          [transforms.Resize((256, 256)),
+                          [transforms.Resize((128, 128)),
                            transforms.ToTensor(), 
                            transforms.Normalize(mean = opts.mean, std = opts.std)])
 
@@ -46,7 +46,7 @@ def unnormalize(sample):
 
 
 def train(opts):
-    encoder = resnetEncoder(opts.cuda)
+    encoder = resnetEncoder(nz=512, cuda=opts.cuda)
     decoder = dcganDecoder(nz=512)
     if opts.cuda:  
         encoder = encoder.cuda()
@@ -54,7 +54,13 @@ def train(opts):
 
     dataloader = load_data(opts)
 
-    enc_optimizer = optim.Adam(decoder.parameters(), lr=opts.lr)
+    enc_optimizer = optim.Adam(encoder.parameters(), lr=opts.lr)
+    if isinstance(encoder, resnetEncoder):
+        enc_params = [{'params': encoder.features.parameters(), 'lr': opts.lr * 0.1},
+                {'params': encoder.mu.parameters()},
+                {'params': encoder.logvar.parameters()}]
+        enc_optimizer = optim.Adam(enc_params, lr=opts.lr)
+    
     dec_optimizer = optim.Adam(decoder.parameters(), lr=opts.lr)
 
     writer = SummaryWriter(opts.save_path)
@@ -89,7 +95,7 @@ def train(opts):
 
             def loss_func(X_sample, mu, logvar):
                 # reconstruction loss
-                recon_loss = F.binary_cross_entropy(X_sample, X)
+                recon_loss = F.binary_cross_entropy(X_sample, X, size_average=False)
 
                 # KL divergence loss
                 kld_loss = -0.5 * torch.sum(1 + z_logvar - z_mu.pow(2) - z_logvar.exp())
@@ -100,8 +106,8 @@ def train(opts):
             # backpropagate
             overall_loss.backward()
             running_loss += overall_loss.item()
-            enc_optimizer.step()
             dec_optimizer.step()
+            enc_optimizer.step()
 
             iters += 1
 
@@ -115,14 +121,12 @@ def train(opts):
                 decoder.eval()
                 z_sample, mu, logvar = encoder(X)
                 X_sample = decoder(z_sample)
-                def repeat_vector(vec, dims):
-                    return torch.Tensor(vec).view(1, 3, 1, 1).repeat(dims[0], 1, dims[2], dims[3])
                 
                 comparison = torch.cat([X, X_sample])
                 # img_name = 'results/reconstruction_' + str(batch_idx) + '_' + str(epoch) + '.png'
                 # utils.save_image(comparison.cpu().data,
                         # os.path.join(opts.save_path, img_name), nrow=n)
-                grid = utils.make_grid(unnormalize(comparison.cpu().data))
+                grid = utils.make_grid(unnormalize(comparison.cpu().data), nrow=opts.batch_size)
                 writer.add_image('image_reconstruction', grid, iters)
                 writer.add_scalar('loss', overall_loss.item(), iters)
                 
@@ -133,7 +137,7 @@ def train(opts):
         torch.save(decoder.state_dict(), os.path.join(opts.save_path, 'decoder'))
         encoder.eval()
         decoder.eval()
-        sample = Variable(torch.randn(16, 256))
+        sample = Variable(torch.randn(16, 512))
 
         if opts.cuda:
             sample = sample.cuda()

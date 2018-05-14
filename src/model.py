@@ -120,7 +120,7 @@ class resnetEncoder(nn.Module):
                                       resnet_copy.layer2,
                                       resnet_copy.layer3,
                                       resnet_copy.layer4,
-                                      nn.AvgPool2d(kernel_size=8, stride=8, padding=0, ceil_mode=False, count_include_pad=True)
+                                      nn.AvgPool2d(kernel_size=4, stride=4, padding=0, ceil_mode=False, count_include_pad=True)
                                       )
         self.mu     = init_xavier(nn.Linear(512, self.nz))
         self.logvar = init_xavier(nn.Linear(512, self.nz))
@@ -165,11 +165,11 @@ class dcganDecoder(nn.Module):
                     nn.BatchNorm2d(ngf * 2),
                     nn.ReLU(True),
                     # state size. (ngf*2) x 64 x 64
-                    nn.ConvTranspose2d( ngf * 2,       ngf, 4, 2, 1, bias=False),
-                    nn.BatchNorm2d(ngf),
-                    nn.ReLU(True),
+                    nn.ConvTranspose2d( ngf * 2,       nc, 4, 2, 1, bias=False),
+                    #nn.BatchNorm2d(ngf),
+                    #nn.ReLU(True),
                     # state size. (ngf) x 128 x 128
-                    nn.ConvTranspose2d(     ngf,        nc, 4, 2, 1, bias=False),
+                    #nn.ConvTranspose2d(     ngf,        nc, 4, 2, 1, bias=False),
                     nn.Sigmoid()
                     # state size. (nc) x 256 x 256
                     )
