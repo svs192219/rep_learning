@@ -16,7 +16,7 @@ import pdb
 import gpustat
 
 # import models.dcgan as dcgan
-from models.wgan import *
+from wgan import *
 
 import torch
 import torchvision
@@ -200,7 +200,7 @@ def train(opts):
         
         optimizer_g.step()
         end = timer()
-        print(f'---train G elapsed time: {end - start}')
+        print('---train G elapsed time: %f' % (end - start))
         #---------------------TRAIN D------------------------
         for p in aD.parameters():  # reset requires_grad
             p.requires_grad_(True)  # they are set to False below in training G
@@ -215,7 +215,7 @@ def train(opts):
             with torch.no_grad():
                 noisev = noise  # totally freeze G, training D
             fake_data = aG(noisev).detach()
-            end = timer(); print(f'---gen G elapsed time: {end-start}')
+            end = timer(); print('---gen G elapsed time: %f' % (end-start))
             start = timer()
             batch = next(dataiter, None)
             if batch is None:
@@ -223,7 +223,7 @@ def train(opts):
                 batch = dataiter.next()
             batch = batch[0] #batch[1] contains labels
             real_data = batch.to(device) #TODO: modify load_data for each loading
-            end = timer(); print(f'---load real imgs elapsed time: {end-start}')
+            end = timer(); print('---load real imgs elapsed time: %f' % (end-start))
             start = timer()
 
             # train with real data
@@ -266,7 +266,7 @@ def train(opts):
                     tensors = torchvision.utils.make_grid(tensor, nrow=8,padding=1)
                     writer.add_image('D/conv1', tensors, iteration)
 
-            end = timer(); print(f'---train D elapsed time: {end-start}')
+            end = timer(); print('---train D elapsed time: %f' % (end-start))
         #---------------VISUALIZATION---------------------
         writer.add_scalar('data/gen_cost', gen_cost, iteration)
 
