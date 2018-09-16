@@ -58,6 +58,8 @@ def showMemoryUsage(device=1):
     item = gpu_stats.jsonify()["gpus"][device]
     print('Used/total: ' + "{}/{}".format(item["memory.used"], item["memory.total"]))
 
+def str2bool(v):
+    return v.lower() in ("yes", "true", "t", "1")
 
 def weights_init(m):
     if isinstance(m, MyConvo2d): 
