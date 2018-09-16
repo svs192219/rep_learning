@@ -129,22 +129,25 @@ def generate_image(netG, noise=None):
 
 OLDGAN = False
 
-def gen_rand_noise():
-    if OLDGAN:
-        noise = torch.FloatTensor(BATCH_SIZE,128,1,1)
-        noise.resize_(BATCH_SIZE,128,1,1).normal_(0,1)
-    else:
-        noise = torch.randn(BATCH_SIZE, 128)
-    noise = noise.to(device)
-
-    return noise
-
 
 #Reference: https://github.com/caogang/wgan-gp/blob/master/gan_cifar10.py
 def train(opts):
     cuda_available = torch.cuda.is_available()
     device = torch.device("cuda" if cuda_available else "cpu")
-    fixed_noise = gen_rand_noise() 
+
+    def gen_rand_noise():
+        if OLDGAN:
+            noise = torch.FloatTensor(BATCH_SIZE,128,1,1)
+            noise.resize_(BATCH_SIZE,128,1,1).normal_(0,1)
+        else:
+            noise = torch.randn(BATCH_SIZE, 128)
+        noise = noise.to(device)
+
+        return noise
+
+    
+    fixed_noise = gen_rand_noise()
+
 
     if RESTORE_MODE:
         aG = torch.load(opts.save_path + "generator.pt")
