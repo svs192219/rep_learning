@@ -48,10 +48,12 @@ DIM = 64 # Model dimensionality
 CRITIC_ITERS = 5 # How many iterations to train the critic for
 GENER_ITERS = 1
 N_GPUS = 1 # Number of GPUs
-BATCH_SIZE = 64# Batch size. Must be a multiple of N_GPUS
+BATCH_SIZE = 8# Batch size. Must be a multiple of N_GPUS
 END_ITER = 100000 # How many iterations to train for
 LAMBDA = 10 # Gradient penalty lambda hyperparameter
 OUTPUT_DIM = 64*64*3 # Number of pixels in each image
+OLDGAN = False
+
 
 def showMemoryUsage(device=1):
     gpu_stats = gpustat.GPUStatCollection.new_query()
@@ -78,21 +80,20 @@ def weights_init(m):
 
 def load_data(path_to_folder, classes):
     data_transform = transforms.Compose([
-                 transforms.Scale(64),
-                 transforms.CenterCrop(64),
+                 transforms.Resize((64, 64)),
                  transforms.ToTensor(),
                  transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
                 ])
     
-    dataset = datasets.ImageFolder(root=(path_to_folder + '/' + classes), transform=data_transform)
+    dataset = datasets.ImageFolder(root=(path_to_folder + classes), transform=data_transform)
     dataset_loader = torch.utils.data.DataLoader(dataset,batch_size=BATCH_SIZE, shuffle=True, num_workers=5, drop_last=True, pin_memory=True)
     return dataset_loader
 
 def training_data_loader(opts):
-    return load_data(opts.dataset_path, 'train') 
+    return load_data(opts.dataset_path, '/train') 
 
 def val_data_loader():
-    return load_data(opts.dataset_path, 'val') 
+    return load_data(opts.dataset_path, '/val') 
 
 def calc_gradient_penalty(netD, real_data, fake_data):
     alpha = torch.rand(BATCH_SIZE, 1)
@@ -127,25 +128,25 @@ def generate_image(netG, noise=None):
     samples = samples * 0.5 + 0.5
     return samples
 
-OLDGAN = False
+cuda_available = torch.cuda.is_available()
+device = torch.device("cuda" if cuda_available else "cpu")
+
+
+def gen_rand_noise():
+    if OLDGAN:
+        noise = torch.FloatTensor(BATCH_SIZE,128,1,1)
+        noise.resize_(BATCH_SIZE,128,1,1).normal_(0,1)
+    else:
+        noise = torch.randn(BATCH_SIZE, 128)
+        noise = noise.to(device)
+
+    return noise
+
 
 
 #Reference: https://github.com/caogang/wgan-gp/blob/master/gan_cifar10.py
 def train(opts):
-    cuda_available = torch.cuda.is_available()
-    device = torch.device("cuda" if cuda_available else "cpu")
-
-    def gen_rand_noise():
-        if OLDGAN:
-            noise = torch.FloatTensor(BATCH_SIZE,128,1,1)
-            noise.resize_(BATCH_SIZE,128,1,1).normal_(0,1)
-        else:
-            noise = torch.randn(BATCH_SIZE, 128)
-        noise = noise.to(device)
-
-        return noise
-
-    
+        
     fixed_noise = gen_rand_noise()
 
 

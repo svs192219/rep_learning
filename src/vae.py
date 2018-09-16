@@ -46,8 +46,8 @@ def unnormalize(sample):
 
 
 def train(opts):
-    encoder = resnetEncoder(nz=512, cuda=opts.cuda)
-    decoder = dcganDecoder(nz=512)
+    encoder = resnetEncoder(nz=opts.latent_dim, cuda=opts.cuda)
+    decoder = dcganDecoder(nz=opts.latent_dim)
     if opts.cuda:  
         encoder = encoder.cuda()
         decoder = decoder.cuda()
@@ -137,7 +137,7 @@ def train(opts):
         torch.save(decoder.state_dict(), os.path.join(opts.save_path, 'decoder'))
         encoder.eval()
         decoder.eval()
-        sample = Variable(torch.randn(16, 512))
+        sample = Variable(torch.randn(16, opts.latent_dim))
 
         if opts.cuda:
             sample = sample.cuda()
@@ -164,6 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=0.0)
     parser.add_argument('--lr_scale', type=float, default=0.1)
     parser.add_argument('--log_interval', type=int, default=30)
+    parser.add_argument('--latent_dim', type=int, default=64)
 
     opts = parser.parse_args()
     opts.mean = [0.485, 0.456, 0.406]
